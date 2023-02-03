@@ -25,28 +25,20 @@ var stats struct {
 }
 
 var args struct {
-	remove    bool
-	recursive bool
-	q         bool
-	qq        bool
-	dryrun    bool
+	remove        bool
+	recursive     bool
+	q             bool
+	qq            bool
+	dryrun        bool
+	checkfilename bool
+	onlyfilename  bool
+	md5           bool
 }
 
-// walkFn is used when `cshatag` is called with the `--recursive` option. It is the function called
-// for each file or directory visited whilst traversing the file tree.
-func walkFn(path string, info os.FileInfo, err error) error {
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error accessing %q: %v\n", path, err)
-		stats.errorsOpening++
-	} else if info.Mode().IsRegular() {
-		checkFile(path)
-	} else if !info.IsDir() {
-		if !args.qq {
-			fmt.Printf("<nonregular> %s\n", path)
-		}
-	}
-	return nil
-}
+var gBMd5 = false
+var gBCheckFilename = false
+var gBOnlyFilename = false
+
 
 // processArg is called for each command-line argument given. For regular files it will call
 // `checkFile`. Directories will be processed recursively provided the `--recursive` flag is set.
@@ -57,7 +49,7 @@ func processArg(fn string) {
 		fmt.Fprintln(os.Stderr, err)
 		stats.errorsOpening++
 	} else if fi.Mode().IsRegular() {
-		checkFile(fn)
+		checkFile(gBMd5, fn)
 	} else if fi.IsDir() {
 		if args.recursive {
 			filepath.Walk(fn, walkFn)
@@ -81,6 +73,9 @@ func main() {
 	flag.BoolVar(&args.remove, "remove", false, "Remove any previously stored extended attributes.")
 	flag.BoolVar(&args.q, "q", false, "quiet: don't print <ok> files")
 	flag.BoolVar(&args.qq, "qq", false, "quiet²: Only print <corrupt> files and errors")
+	flag.BoolVar(&args.md5, "md5", false, "md5 Use MD5 hash instead of Sha256 hash")
+	flag.BoolVar(&args.checkfilename, "checkfilename", false, "Check filename contains a hash that matches the actual hash")
+	flag.BoolVar(&args.onlyfilename, "onlyfilename", false, "Only check filename contains a hash that matches the EXISTING actual hash")
 	flag.BoolVar(&args.recursive, "recursive", false, "Recursively descend into subdirectories. "+
 		"Symbolic links are not followed.")
 	flag.BoolVar(&args.dryrun, "dry-run", false, "don't make any changes")
@@ -98,6 +93,18 @@ func main() {
 	if args.qq {
 		// quiet2 implies quiet
 		args.q = true
+	}
+	if args.md5 {
+		// md5 means use md5 hash instead of sha256
+		gBMd5 = true
+	}
+	if args.checkfilename {
+		// checkfilename means check filename contains a hash that matches the actual hash
+		gBCheckFilename = true
+	}
+	if args.onlyfilename {
+		// only checkfilename means check filename contains a hash that matches the EXISTING actual hash
+		gBOnlyFilename = true
 	}
 
 	for _, fn := range flag.Args() {
@@ -125,3 +132,22 @@ func main() {
 	}
 	os.Exit(6)
 }
+
+
+
+// walkFn is used when `cshatag` is called with the `--recursive` option. It is the function called
+// for each file or directory visited whilst traversing the file tree.
+func walkFn(path string, info os.FileInfo, err error) error {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error accessing %q: %v\n", path, err)
+		stats.errorsOpening++
+	} else if info.Mode().IsRegular() {
+		checkFile(gBMd5, path)
+	} else if !info.IsDir() {
+		if !args.qq {
+			fmt.Printf("<nonregular> %s\n", path)
+		}
+	}
+	return nil
+}
+
