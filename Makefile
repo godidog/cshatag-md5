@@ -1,5 +1,5 @@
 PREFIX ?= /usr/local
-GITVERSION := $(shell git describe --dirty)
+GITVERSION := $(shell git describe --dirty --always)
 TARGZ := cshatag_${GITVERSION}_$(shell go env GOOS)-static_$(shell go env GOARCH).tar.gz
 GPG_KEY_ID ?= 23A02740
 
