@@ -2,3 +2,4 @@
 cshatag
 *.tar.gz
 *.tar.gz.asc
+.vscode/*

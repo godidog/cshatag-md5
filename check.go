@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -40,6 +41,23 @@ func zeroFileTimeStamp() fileTimestamp {
 
 func (ts *fileTimestamp) prettyPrint() string {
 	return fmt.Sprintf("%010d.%09d", ts.s, ts.ns)
+}
+
+// equalTruncatedTimestamp compares ts and ts2 with 100ns resolution (Linux) or 1s (MacOS).
+// Why 100ns? That's what Samba and the Linux SMB client supports.
+// Why 1s? That's what the MacOS SMB client supports.
+func (ts *fileTimestamp) equalTruncatedTimestamp(ts2 *fileTimestamp) bool {
+	if ts.s != ts2.s {
+		return false
+	}
+	// We only look at integer seconds on MacOS, so we are done here.
+	if runtime.GOOS == "darwin" {
+		return true
+	}
+	if ts.ns/100 != ts2.ns/100 {
+		return false
+	}
+	return true
 }
 
 type fileAttr struct {
@@ -275,6 +293,7 @@ func checkFile(bMd5 bool, fn string) {
 	}
 
 	stored, _ := getStoredAttr(bMd5, f)
+
 	if gBOnlyFilename {
 		// do not try to calc actual md5, only use the stored one
 		bMatch := checkFilename(bMd5, fn, stored)
